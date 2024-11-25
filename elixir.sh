@@ -43,7 +43,7 @@ function check_and_install_docker() {
     fi
 }
 
-
+# Install multiple validator nodes
 function install_multiple_nodes() {
     check_and_install_python
     check_and_install_docker
@@ -81,27 +81,31 @@ function install_multiple_nodes() {
         safe_public_address=${addresses[$((i-1))]}
         private_key=${private_keys[$((i-1))]}
 
-            # Create an .env file for each validator node
-            cat <<EOF > validator_${i}.env
+        # Create an .env file for each validator node
+        cat <<EOF > validator_${i}.env
 ENV=testnet-3
 STRATEGY_EXECUTOR_DISPLAY_NAME=${validator_name}
 STRATEGY_EXECUTOR_BENEFICIARY=${safe_public_address}
 SIGNER_PRIVATE_KEY=${private_key}
 EOF
 
-            # Run the Docker container with --restart unless-stopped and attach to Docker network
-            docker run -d \
-              --env-file validator_${i}.env \
-              --name elixir_${i} \
-              --network elixir_net \
-              --restart unless-stopped \
-              elixirprotocol/validator:v3
+        # Run the Docker container with --restart unless-stopped and attach to Docker network
+        docker run -d \
+          --env-file validator_${i}.env \
+          --name elixir_${i} \
+          --network elixir_net \
+          --restart unless-stopped \
+          elixirprotocol/validator:v3
 
+<<<<<<< HEAD
             echo "Validator node ${validator_name} started."
         fi
+=======
+        echo "Validator node ${validator_name} started."
+>>>>>>> ce87b5d5e0d1ebf5a1d121a33c62c1b17a61e1f9
     done
 
-    echo "Successfully launched $num_nodes validator nodes with rotating proxies."
+    echo "Successfully launched $num_nodes validator nodes."
 }
 
 # Delete all Elixir Docker containers, their .env files, and images
@@ -127,9 +131,6 @@ function delete_docker_container() {
     rm -rf validator_*.env
     echo "Cleanup complete."
 }
-
-# Update all
-
 
 # Update all created validator nodes
 function update_all_nodes() {
@@ -161,32 +162,29 @@ function update_all_nodes() {
         # Remove the Docker container
         docker rm elixir_${i}
 
-            # Pull the latest Docker image
-            docker pull elixirprotocol/validator:v3
+        # Pull the latest Docker image
+        docker pull elixirprotocol/validator:v3
 
-            # Create an .env file for each validator node
-            cat <<EOF > validator_${i}.env
+        # Create an .env file for each validator node
+        cat <<EOF > validator_${i}.env
 ENV=testnet-3
 STRATEGY_EXECUTOR_DISPLAY_NAME=${validator_name}
 STRATEGY_EXECUTOR_BENEFICIARY=${safe_public_address}
 SIGNER_PRIVATE_KEY=${private_key}
 EOF
 
-            # Restart the container with the latest image and attach to Docker network
-            docker run -d \
-              --env-file validator_${i}.env \
-              --name elixir_${i} \
-              --network elixir_net \
-              --restart unless-stopped \
-              elixirprotocol/validator:v3
+        # Restart the container with the latest image and attach to Docker network
+        docker run -d \
+          --env-file validator_${i}.env \
+          --name elixir_${i} \
+          --network elixir_net \
+          --restart unless-stopped \
+          elixirprotocol/validator:v3
 
-            echo "Validator node ${validator_name} updated."
-        else
-            echo "Skipping validator node ${validator_name}."
-        fi
+        echo "Validator node ${validator_name} updated and restarted."
     done
 
-    echo "Successfully updated $num_nodes validator nodes with rotating proxies."
+    echo "Successfully updated $num_nodes validator nodes."
 }
 
 # Main script functionality
