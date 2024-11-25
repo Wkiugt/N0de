@@ -42,17 +42,23 @@ function run_wibucrypto_validator() {
     echo "Welcome to WibuCrypto Validator Setup!"
     echo
 
-    # Prompt for the number of nodes
-    read -p "Enter the number of nodes to create: " NODE_COUNT
-    if ! [[ "$NODE_COUNT" =~ ^[0-9]+$ ]] || [ "$NODE_COUNT" -le 0 ]; then
-        echo "Invalid input. Please enter a positive integer for the number of nodes."
+    # Check if files exist
+    if [ ! -f "privatekeys.txt" ]; then
+        echo "Error: privatekeys.txt not found."
+        exit 1
+    fi
+    if [ ! -f "proxy.txt" ]; then
+        echo "Error: proxy.txt not found."
         exit 1
     fi
 
-    # Prompt for Private Key
-    read -p "Input Your PrivateKey (EVM): " YOUR_PRIVATE_KEY
-    if [ -z "$YOUR_PRIVATE_KEY" ]; then
-        echo "Private Key cannot be empty. Please run the script again and provide a valid private key."
+    # Read private keys and proxies
+    PRIVATE_KEYS=($(cat privatekeys.txt))
+    PROXIES=($(cat proxy.txt))
+    
+    # Ensure matching number of proxies and private keys
+    if [ "${#PRIVATE_KEYS[@]}" -ne "${#PROXIES[@]}" ]; then
+        echo "Error: The number of private keys does not match the number of proxies."
         exit 1
     fi
 
@@ -60,17 +66,22 @@ function run_wibucrypto_validator() {
     echo "Pulling the latest Docker image for glaciernetwork/glacier-verifier:v0.0.1..."
     docker pull docker.io/glaciernetwork/glacier-verifier:v0.0.1
 
-    # Run multiple Docker containers
-    for i in $(seq 1 "$NODE_COUNT"); do
-        CONTAINER_NAME="glacier-verifier-$i"
-        echo "Starting node $i with container name: $CONTAINER_NAME..."
+    # Run Docker containers
+    for i in "${!PRIVATE_KEYS[@]}"; do
+        PRIVATE_KEY=${PRIVATE_KEYS[$i]}
+        PROXY=${PROXIES[$i]}
+        CONTAINER_NAME="glacier-verifier-$((i+1))"
+        echo "Starting node $((i+1)) with container name: $CONTAINER_NAME using proxy: $PROXY..."
+        
         docker run -d \
-            -e PRIVATE_KEY=$YOUR_PRIVATE_KEY \
+            -e PRIVATE_KEY="$PRIVATE_KEY" \
+            -e HTTP_PROXY="$PROXY" \
+            -e HTTPS_PROXY="$PROXY" \
             --name "$CONTAINER_NAME" \
             docker.io/glaciernetwork/glacier-verifier:v0.0.1
     done
 
-    echo "$NODE_COUNT Glacier Verifier containers started successfully with the provided private key."
+    echo "${#PRIVATE_KEYS[@]} Glacier Verifier containers started successfully with the provided private keys and proxies."
 }
 
 # Execute script
