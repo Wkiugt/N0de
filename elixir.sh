@@ -98,8 +98,6 @@ EOF
               elixirprotocol/validator:v3
 
             echo "Validator node ${validator_name} started."
-        else
-            echo "Skipping validator node ${validator_name} due to failed."
         fi
     done
 
