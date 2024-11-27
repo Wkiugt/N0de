@@ -93,12 +93,16 @@ function install_multiple_nodes_from_files() {
             -e HTTPS_PROXY=$PROXY \
             --name $CONTAINER_NAME \
             docker.io/glaciernetwork/glacier-verifier:v0.0.1
+
+        # Check the container logs to diagnose issues
+        sleep 2  # Wait a bit for container to initialize
+        docker logs "$CONTAINER_NAME"
+
         echo "Started container: $CONTAINER_NAME"
     done
 
     echo "All Glacier Verifier nodes have been installed successfully!"
 }
-
 
 # Delete all running Glacier Verifier nodes
 function delete_all_nodes() {
