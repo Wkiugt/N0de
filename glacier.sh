@@ -76,7 +76,8 @@ function install_multiple_nodes_from_files() {
 
     echo "Installing ${#PRIVATE_KEYS[@]} nodes..."
     for i in "${!PRIVATE_KEYS[@]}"; do
-        PRIVATE_KEY=${PRIVATE_KEYS[i]}
+        # Remove any whitespace from the private key
+        PRIVATE_KEY=$(echo "${PRIVATE_KEYS[i]}" | tr -d '[:space:]')
         PROXY=${PROXIES[i]}
         CONTAINER_NAME="glacier-verifier-$((i + 1))"
 
