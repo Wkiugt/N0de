@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -x
 # Ensure script is run as root
 if [ "$(id -u)" != "0" ]; then
     echo "This script needs to be run with root user privileges."
