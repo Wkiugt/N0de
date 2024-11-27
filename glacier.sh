@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x
+
 # Ensure script is run as root
 if [ "$(id -u)" != "0" ]; then
     echo "This script needs to be run with root user privileges."
@@ -43,24 +43,30 @@ function display_banner() {
 
 # Install multiple Glacier Verifier nodes from files
 function install_multiple_nodes_from_files() {
+    echo "Function install_multiple_nodes_from_files called"
     PRIVATE_KEYS_FILE="/root/private_keys.txt"
     PROXY_FILE="/root/proxy.txt"
 
+    # Check if files exist
     if [[ ! -f "$PRIVATE_KEYS_FILE" ]]; then
         echo "Error: $PRIVATE_KEYS_FILE not found!"
+        read -p "Press Enter to continue..."  # Pause for debugging
         return
     fi
     if [[ ! -f "$PROXY_FILE" ]]; then
         echo "Error: $PROXY_FILE not found!"
+        read -p "Press Enter to continue..."  # Pause for debugging
         return
     fi
 
+    echo "Reading private keys and proxies from files..."
     PRIVATE_KEYS=( $(cat "$PRIVATE_KEYS_FILE") )
     RAW_PROXIES=( $(cat "$PROXY_FILE") )
 
-    echo "Private keys: ${PRIVATE_KEYS[@]}"
-    echo "Raw proxies: ${RAW_PROXIES[@]}"
+    echo "Private Keys: ${PRIVATE_KEYS[@]}"
+    echo "Raw Proxies: ${RAW_PROXIES[@]}"
 
+    # Convert RAW_PROXIES to formatted proxies
     PROXIES=()
     for raw_proxy in "${RAW_PROXIES[@]}"; do
         IFS=':' read -r ip port user pass <<< "$raw_proxy"
@@ -68,19 +74,20 @@ function install_multiple_nodes_from_files() {
         PROXIES+=("$formatted_proxy")
     done
 
+    # Ensure both files have the same number of lines
     if [[ ${#PRIVATE_KEYS[@]} -ne ${#PROXIES[@]} ]]; then
         echo "Error: The number of private keys and proxies must match!"
+        read -p "Press Enter to continue..."  # Pause for debugging
         return
     fi
 
+    echo "Installing ${#PRIVATE_KEYS[@]} nodes..."
     for i in "${!PRIVATE_KEYS[@]}"; do
-        echo "Setting up node ${i}..."
         PRIVATE_KEY=${PRIVATE_KEYS[i]}
         PROXY=${PROXIES[i]}
         CONTAINER_NAME="glacier-verifier-$((i + 1))"
 
-        echo "Private key: $PRIVATE_KEY"
-        echo "Proxy: $PROXY"
+        echo "Starting node $CONTAINER_NAME with private key: $PRIVATE_KEY and proxy: $PROXY"
         docker run -d \
             -e PRIVATE_KEY=$PRIVATE_KEY \
             -e HTTP_PROXY=$PROXY \
@@ -89,8 +96,28 @@ function install_multiple_nodes_from_files() {
             docker.io/glaciernetwork/glacier-verifier:v0.0.1
         echo "Started container: $CONTAINER_NAME"
     done
+
+    echo "All Glacier Verifier nodes have been installed successfully!"
+    read -p "Press Enter to continue..."  # Pause for debugging
 }
 
+# Delete all running Glacier Verifier nodes
+function delete_all_nodes() {
+    echo "Stopping and removing all Glacier Verifier containers..."
+    docker ps -a --filter "name=glacier-verifier" --format "{{.ID}}" | while read -r container_id; do
+        docker stop $container_id
+        docker rm $container_id
+        echo "Removed container: $container_id"
+    done
+    echo "All Glacier Verifier nodes have been deleted."
+    read -p "Press Enter to continue..."  # Pause for debugging
+}
+
+# Install a single validator node (placeholder for now)
+function install_single_node() {
+    echo "Function install_single_node not yet implemented."
+    read -p "Press Enter to continue..."  # Pause for debugging
+}
 
 # Display menu and handle user selection
 function show_menu() {
@@ -103,6 +130,7 @@ function show_menu() {
         echo "4. Exit script"
         read -p "Enter your choice: " choice
 
+        echo "You selected option: $choice"  # Debug user input
         case $choice in
             1)
                 install_single_node
@@ -122,17 +150,6 @@ function show_menu() {
                 ;;
         esac
     done
-}
-
-# Delete all running Glacier Verifier nodes
-function delete_all_nodes() {
-    echo "Stopping and removing all Glacier Verifier containers..."
-    docker ps -a --filter "name=glacier-verifier" --format "{{.ID}}" | while read -r container_id; do
-        docker stop $container_id
-        docker rm $container_id
-        echo "Removed container: $container_id"
-    done
-    echo "All Glacier Verifier nodes have been deleted."
 }
 
 # Main execution flow
