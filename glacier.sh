@@ -46,7 +46,6 @@ function install_multiple_nodes_from_files() {
     PRIVATE_KEYS_FILE="/root/private_keys.txt"
     PROXY_FILE="/root/proxy.txt"
 
-    # Check if files exist
     if [[ ! -f "$PRIVATE_KEYS_FILE" ]]; then
         echo "Error: $PRIVATE_KEYS_FILE not found!"
         return
@@ -56,11 +55,12 @@ function install_multiple_nodes_from_files() {
         return
     fi
 
-    echo "Reading private keys and proxies from files..."
     PRIVATE_KEYS=( $(cat "$PRIVATE_KEYS_FILE") )
     RAW_PROXIES=( $(cat "$PROXY_FILE") )
-    
-    # Convert RAW_PROXIES to formatted proxies
+
+    echo "Private keys: ${PRIVATE_KEYS[@]}"
+    echo "Raw proxies: ${RAW_PROXIES[@]}"
+
     PROXIES=()
     for raw_proxy in "${RAW_PROXIES[@]}"; do
         IFS=':' read -r ip port user pass <<< "$raw_proxy"
@@ -68,19 +68,19 @@ function install_multiple_nodes_from_files() {
         PROXIES+=("$formatted_proxy")
     done
 
-    # Ensure both files have the same number of lines
     if [[ ${#PRIVATE_KEYS[@]} -ne ${#PROXIES[@]} ]]; then
         echo "Error: The number of private keys and proxies must match!"
         return
     fi
 
-    echo "Installing ${#PRIVATE_KEYS[@]} nodes..."
     for i in "${!PRIVATE_KEYS[@]}"; do
+        echo "Setting up node ${i}..."
         PRIVATE_KEY=${PRIVATE_KEYS[i]}
         PROXY=${PROXIES[i]}
         CONTAINER_NAME="glacier-verifier-$((i + 1))"
 
-        echo "Starting node $CONTAINER_NAME with private key and proxy..."
+        echo "Private key: $PRIVATE_KEY"
+        echo "Proxy: $PROXY"
         docker run -d \
             -e PRIVATE_KEY=$PRIVATE_KEY \
             -e HTTP_PROXY=$PROXY \
@@ -89,9 +89,8 @@ function install_multiple_nodes_from_files() {
             docker.io/glaciernetwork/glacier-verifier:v0.0.1
         echo "Started container: $CONTAINER_NAME"
     done
-
-    echo "All Glacier Verifier nodes have been installed successfully!"
 }
+
 
 # Display menu and handle user selection
 function show_menu() {
