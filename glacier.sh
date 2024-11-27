@@ -43,8 +43,8 @@ function display_banner() {
 
 # Install multiple Glacier Verifier nodes from files
 function install_multiple_nodes_from_files() {
-    PRIVATE_KEYS_FILE="/home/private_keys.txt"
-    PROXY_FILE="/home/proxy.txt"
+    PRIVATE_KEYS_FILE="/root/private_keys.txt"
+    PROXY_FILE="/root/proxy.txt"
 
     # Check if files exist
     if [[ ! -f "$PRIVATE_KEYS_FILE" ]]; then
