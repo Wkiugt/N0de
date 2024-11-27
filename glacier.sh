@@ -43,29 +43,23 @@ function display_banner() {
 
 # Install multiple Glacier Verifier nodes from files
 function install_multiple_nodes_from_files() {
-    echo "Function install_multiple_nodes_from_files called"
     PRIVATE_KEYS_FILE="/root/private_keys.txt"
     PROXY_FILE="/root/proxy.txt"
 
     # Check if files exist
     if [[ ! -f "$PRIVATE_KEYS_FILE" ]]; then
         echo "Error: $PRIVATE_KEYS_FILE not found!"
-        read -p "Press Enter to continue..."  # Pause for debugging
         return
     fi
     if [[ ! -f "$PROXY_FILE" ]]; then
         echo "Error: $PROXY_FILE not found!"
-        read -p "Press Enter to continue..."  # Pause for debugging
         return
     fi
 
     echo "Reading private keys and proxies from files..."
     PRIVATE_KEYS=( $(cat "$PRIVATE_KEYS_FILE") )
     RAW_PROXIES=( $(cat "$PROXY_FILE") )
-
-    echo "Private Keys: ${PRIVATE_KEYS[@]}"
-    echo "Raw Proxies: ${RAW_PROXIES[@]}"
-
+    
     # Convert RAW_PROXIES to formatted proxies
     PROXIES=()
     for raw_proxy in "${RAW_PROXIES[@]}"; do
@@ -77,7 +71,6 @@ function install_multiple_nodes_from_files() {
     # Ensure both files have the same number of lines
     if [[ ${#PRIVATE_KEYS[@]} -ne ${#PROXIES[@]} ]]; then
         echo "Error: The number of private keys and proxies must match!"
-        read -p "Press Enter to continue..."  # Pause for debugging
         return
     fi
 
@@ -87,7 +80,13 @@ function install_multiple_nodes_from_files() {
         PROXY=${PROXIES[i]}
         CONTAINER_NAME="glacier-verifier-$((i + 1))"
 
-        echo "Starting node $CONTAINER_NAME with private key: $PRIVATE_KEY and proxy: $PROXY"
+        # Kiểm tra và xóa container nếu đã tồn tại
+        if [ "$(docker ps -a --filter "name=$CONTAINER_NAME" --format '{{.ID}}')" ]; then
+            echo "Container with name $CONTAINER_NAME already exists. Removing it..."
+            docker rm -f "$CONTAINER_NAME"
+        fi
+
+        echo "Starting node $CONTAINER_NAME with private key and proxy..."
         docker run -d \
             -e PRIVATE_KEY=$PRIVATE_KEY \
             -e HTTP_PROXY=$PROXY \
@@ -98,8 +97,8 @@ function install_multiple_nodes_from_files() {
     done
 
     echo "All Glacier Verifier nodes have been installed successfully!"
-    read -p "Press Enter to continue..."  # Pause for debugging
 }
+
 
 # Delete all running Glacier Verifier nodes
 function delete_all_nodes() {
