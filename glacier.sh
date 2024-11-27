@@ -11,6 +11,7 @@ fi
 function setup_environment() {
     echo "Checking and installing required tools..."
     
+    # Install figlet and toilet for styled text
     if ! command -v figlet &> /dev/null; then
         echo "Installing figlet..."
         sudo apt-get update
@@ -21,6 +22,7 @@ function setup_environment() {
         sudo apt-get install -y toilet
     fi
 
+    # Install Docker
     if ! command -v docker &> /dev/null; then
         echo "Docker not detected, installing..."
         sudo apt-get update
@@ -32,130 +34,77 @@ function setup_environment() {
     fi
 }
 
-# Display styled "WibuCrypto" banner
-function display_banner() {
+# Read proxy from file
+function read_proxy() {
+    if [ ! -f "proxy.txt" ]; then
+        echo "proxy.txt file not found! Please make sure the proxy.txt file exists."
+        exit 1
+    fi
+    
+    # Read proxy from file
+    PROXIES=()
+    while IFS= read -r line; do
+        PROXIES+=("$line")
+    done < "proxy.txt"
+}
+
+# Display styled "WibuCrypto" and run Glacier Verifier
+function run_wibucrypto_validator() {
     clear
     toilet -f future "WibuCrypto" --gay
     echo
     echo "Welcome to WibuCrypto Validator Setup!"
     echo
-}
 
-# Install multiple Glacier Verifier nodes from files
-function install_multiple_nodes_from_files() {
-    PRIVATE_KEYS_FILE="/root/private_keys.txt"
-    PROXY_FILE="/root/proxy.txt"
-
-    # Check if files exist
-    if [[ ! -f "$PRIVATE_KEYS_FILE" ]]; then
-        echo "Error: $PRIVATE_KEYS_FILE not found!"
-        return
-    fi
-    if [[ ! -f "$PROXY_FILE" ]]; then
-        echo "Error: $PROXY_FILE not found!"
-        return
+    # Prompt for the number of nodes
+    read -p "Enter the number of nodes you want to create: " NODE_COUNT
+    if ! [[ "$NODE_COUNT" =~ ^[0-9]+$ ]] || [ "$NODE_COUNT" -le 0 ]; then
+        echo "Please enter a valid number of nodes."
+        exit 1
     fi
 
-    echo "Reading private keys and proxies from files..."
-    PRIVATE_KEYS=( $(cat "$PRIVATE_KEYS_FILE") )
-    RAW_PROXIES=( $(cat "$PROXY_FILE") )
-    
-    # Convert RAW_PROXIES to formatted proxies
-    PROXIES=()
-    for raw_proxy in "${RAW_PROXIES[@]}"; do
-        IFS=':' read -r ip port user pass <<< "$raw_proxy"
-        formatted_proxy="http://${user}:${pass}@${ip}:${port}"
-        PROXIES+=("$formatted_proxy")
-    done
+    # Loop through each node creation
+    for (( i=1; i<=NODE_COUNT; i++ )); do
+        echo "Creating node $i..."
 
-    # Ensure both files have the same number of lines
-    if [[ ${#PRIVATE_KEYS[@]} -ne ${#PROXIES[@]} ]]; then
-        echo "Error: The number of private keys and proxies must match!"
-        return
-    fi
-
-    echo "Installing ${#PRIVATE_KEYS[@]} nodes..."
-    for i in "${!PRIVATE_KEYS[@]}"; do
-        # Remove any whitespace from the private key
-        PRIVATE_KEY=$(echo "${PRIVATE_KEYS[i]}" | tr -d '[:space:]')
-        PROXY=${PROXIES[i]}
-        CONTAINER_NAME="glacier-verifier-$((i + 1))"
-
-        # Kiểm tra và xóa container nếu đã tồn tại
-        if [ "$(docker ps -a --filter "name=$CONTAINER_NAME" --format '{{.ID}}')" ]; then
-            echo "Container with name $CONTAINER_NAME already exists. Removing it..."
-            docker rm -f "$CONTAINER_NAME"
+        # Prompt for Private Key for each node
+        read -p "Input PrivateKey for node $i (EVM): " YOUR_PRIVATE_KEY
+        if [ -z "$YOUR_PRIVATE_KEY" ]; then
+            echo "Private Key cannot be empty. Skipping node $i."
+            continue
         fi
 
-        echo "Starting node $CONTAINER_NAME with private key and proxy..."
+        # Pull Docker image
+        echo "Pulling the latest Docker image for glaciernetwork/glacier-verifier:v0.0.1..."
+        docker pull docker.io/glaciernetwork/glacier-verifier:v0.0.1
+
+        # Read proxy for this node from proxy.txt
+        PROXY_INDEX=$(( (i - 1) % ${#PROXIES[@]} ))
+        PROXY=${PROXIES[$PROXY_INDEX]}
+        PROXY_IP=$(echo $PROXY | cut -d':' -f1)
+        PROXY_PORT=$(echo $PROXY | cut -d':' -f2)
+        PROXY_USER=$(echo $PROXY | cut -d':' -f3)
+        PROXY_PASS=$(echo $PROXY | cut -d':' -f4)
+
+        # Set up proxy environment variables for Docker
+        echo "Setting up proxy for node $i with proxy $PROXY_IP:$PROXY_PORT"
+        export HTTP_PROXY="http://$PROXY_USER:$PROXY_PASS@$PROXY_IP:$PROXY_PORT"
+        export HTTPS_PROXY="http://$PROXY_USER:$PROXY_PASS@$PROXY_IP:$PROXY_PORT"
+
+        # Run Docker container for the node
+        CONTAINER_NAME="glacier-verifier-node-$i"
         docker run -d \
-            -e PRIVATE_KEY=$PRIVATE_KEY \
-            -e HTTP_PROXY=$PROXY \
-            -e HTTPS_PROXY=$PROXY \
+            -e PRIVATE_KEY=$YOUR_PRIVATE_KEY \
+            -e HTTP_PROXY=$HTTP_PROXY \
+            -e HTTPS_PROXY=$HTTPS_PROXY \
             --name $CONTAINER_NAME \
             docker.io/glaciernetwork/glacier-verifier:v0.0.1
 
-        # Check the container logs to diagnose issues
-        sleep 2  # Wait a bit for container to initialize
-        docker logs "$CONTAINER_NAME"
-
-        echo "Started container: $CONTAINER_NAME"
-    done
-
-    echo "All Glacier Verifier nodes have been installed successfully!"
-}
-
-# Delete all running Glacier Verifier nodes
-function delete_all_nodes() {
-    echo "Stopping and removing all Glacier Verifier containers..."
-    docker ps -a --filter "name=glacier-verifier" --format "{{.ID}}" | while read -r container_id; do
-        docker stop $container_id
-        docker rm $container_id
-        echo "Removed container: $container_id"
-    done
-    echo "All Glacier Verifier nodes have been deleted."
-    read -p "Press Enter to continue..."  # Pause for debugging
-}
-
-# Install a single validator node (placeholder for now)
-function install_single_node() {
-    echo "Function install_single_node not yet implemented."
-    read -p "Press Enter to continue..."  # Pause for debugging
-}
-
-# Display menu and handle user selection
-function show_menu() {
-    while true; do
-        display_banner
-        echo "Please choose an option:"
-        echo "1. Install a single validator node"
-        echo "2. Install multiple validator nodes (from files)"
-        echo "3. Delete all nodes"
-        echo "4. Exit script"
-        read -p "Enter your choice: " choice
-
-        echo "You selected option: $choice"  # Debug user input
-        case $choice in
-            1)
-                install_single_node
-                ;;
-            2)
-                install_multiple_nodes_from_files
-                ;;
-            3)
-                delete_all_nodes
-                ;;
-            4)
-                echo "Exiting script. Goodbye!"
-                exit 0
-                ;;
-            *)
-                echo "Invalid choice. Please try again."
-                ;;
-        esac
+        echo "Glacier Verifier node $i started successfully with the provided private key and proxy."
     done
 }
 
-# Main execution flow
+# Execute script
 setup_environment
-show_menu
+read_proxy
+run_wibucrypto_validator
