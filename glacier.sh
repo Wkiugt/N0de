@@ -10,7 +10,7 @@ fi
 # Check and install required tools (figlet and toilet) and Docker
 function setup_environment() {
     echo "Checking and installing required tools..."
-    
+
     # Install figlet and toilet for styled text
     if ! command -v figlet &> /dev/null; then
         echo "Installing figlet..."
@@ -34,14 +34,14 @@ function setup_environment() {
     fi
 }
 
-# Read proxy from file
+# Read proxies from file
 function read_proxy() {
     if [ ! -f "proxy.txt" ]; then
         echo "proxy.txt file not found! Please make sure the proxy.txt file exists."
         exit 1
     fi
-    
-    # Read proxy from file
+
+    # Read proxies into an array
     PROXIES=()
     while IFS= read -r line; do
         PROXIES+=("$line")
@@ -55,13 +55,15 @@ function read_private_keys() {
         exit 1
     fi
 
-    # Read private keys from file, ignoring empty lines
+    # Read private keys into an array
     PRIVATE_KEYS=()
     while IFS= read -r line || [ -n "$line" ]; do
-        # Trim leading/trailing whitespace and skip empty lines
+        # Trim leading/trailing whitespace
         key=$(echo "$line" | xargs)
-        if [ -n "$key" ]; then
+        if [[ "$key" =~ ^0x[0-9a-fA-F]{64}$ ]]; then
             PRIVATE_KEYS+=("$key")
+        else
+            echo "Invalid private key format: $key"
         fi
     done < "privatekeys.txt"
 
@@ -69,6 +71,8 @@ function read_private_keys() {
         echo "No valid private keys found in privatekeys.txt."
         exit 1
     fi
+
+    echo "Loaded ${#PRIVATE_KEYS[@]} private keys."
 }
 
 # Delete all nodes
@@ -93,42 +97,44 @@ function run_wibucrypto_validator() {
         exit 1
     fi
 
-if [ "$NODE_COUNT" -gt "${#PRIVATE_KEYS[@]}" ]; then
-    echo "Requested $NODE_COUNT nodes, but only ${#PRIVATE_KEYS[@]} private keys are available in privatekeys.txt."
-    exit 1
-fi
-
+    if [ "$NODE_COUNT" -gt "${#PRIVATE_KEYS[@]}" ]; then
+        echo "Requested $NODE_COUNT nodes, but only ${#PRIVATE_KEYS[@]} private keys are available in privatekeys.txt."
+        exit 1
+    fi
 
     # Loop through each node creation
     for (( i=1; i<=NODE_COUNT; i++ )); do
         echo "Creating node $i..."
 
-        # Get Private Key from privatekeys.txt
+        # Get private key
         YOUR_PRIVATE_KEY=${PRIVATE_KEYS[$((i-1))]}
-        if [ -z "$YOUR_PRIVATE_KEY" ]; then
-            echo "Private Key for node $i is empty. Skipping node."
-            continue
-        fi
+        echo "Using private key: $YOUR_PRIVATE_KEY"
 
         # Pull Docker image
         echo "Pulling the latest Docker image for glaciernetwork/glacier-verifier:v0.0.1..."
         docker pull docker.io/glaciernetwork/glacier-verifier:v0.0.1
 
-        # Read proxy for this node from proxy.txt
+        # Get proxy for the node
         PROXY_INDEX=$(( (i - 1) % ${#PROXIES[@]} ))
         PROXY=${PROXIES[$PROXY_INDEX]}
         PROXY_IP=$(echo $PROXY | cut -d':' -f1)
         PROXY_PORT=$(echo $PROXY | cut -d':' -f2)
         PROXY_USER=$(echo $PROXY | cut -d':' -f3)
         PROXY_PASS=$(echo $PROXY | cut -d':' -f4)
+        echo "Using proxy: $PROXY_IP:$PROXY_PORT"
 
         # Set up proxy environment variables for Docker
-        echo "Setting up proxy for node $i with proxy $PROXY_IP:$PROXY_PORT"
         export HTTP_PROXY="http://$PROXY_USER:$PROXY_PASS@$PROXY_IP:$PROXY_PORT"
         export HTTPS_PROXY="http://$PROXY_USER:$PROXY_PASS@$PROXY_IP:$PROXY_PORT"
 
-        # Run Docker container for the node
+        # Check for existing container and remove if exists
         CONTAINER_NAME="glacier-verifier-node-$i"
+        if docker ps -a --format '{{.Names}}' | grep -q "^$CONTAINER_NAME$"; then
+            echo "Container name $CONTAINER_NAME already exists. Removing it..."
+            docker rm -f $CONTAINER_NAME
+        fi
+
+        # Run Docker container for the node
         docker run -d \
             -e PRIVATE_KEY=$YOUR_PRIVATE_KEY \
             -e HTTP_PROXY=$HTTP_PROXY \
@@ -136,7 +142,7 @@ fi
             --name $CONTAINER_NAME \
             docker.io/glaciernetwork/glacier-verifier:v0.0.1
 
-        echo "Glacier Verifier node $i started successfully with the provided private key and proxy."
+        echo "Glacier Verifier node $i started successfully."
     done
 }
 
