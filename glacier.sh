@@ -48,6 +48,27 @@ function read_proxy() {
     done < "proxy.txt"
 }
 
+# Read private keys from file
+function read_private_keys() {
+    if [ ! -f "privatekeys.txt" ]; then
+        echo "privatekeys.txt file not found! Please make sure the privatekeys.txt file exists."
+        exit 1
+    fi
+    
+    # Read private keys from file
+    PRIVATE_KEYS=()
+    while IFS= read -r line; do
+        PRIVATE_KEYS+=("$line")
+    done < "privatekeys.txt"
+}
+
+# Delete all nodes
+function delete_all_nodes() {
+    echo "Deleting all running nodes..."
+    docker ps -q --filter "name=glacier-verifier-node-" | xargs -r docker rm -f
+    echo "All nodes have been deleted."
+}
+
 # Display styled "WibuCrypto" and run Glacier Verifier
 function run_wibucrypto_validator() {
     clear
@@ -63,14 +84,19 @@ function run_wibucrypto_validator() {
         exit 1
     fi
 
+    if [ "$NODE_COUNT" -gt "${#PRIVATE_KEYS[@]}" ]; then
+        echo "Not enough private keys in privatekeys.txt for $NODE_COUNT nodes."
+        exit 1
+    fi
+
     # Loop through each node creation
     for (( i=1; i<=NODE_COUNT; i++ )); do
         echo "Creating node $i..."
 
-        # Prompt for Private Key for each node
-        read -p "Input PrivateKey for node $i (EVM): " YOUR_PRIVATE_KEY
+        # Get Private Key from privatekeys.txt
+        YOUR_PRIVATE_KEY=${PRIVATE_KEYS[$((i-1))]}
         if [ -z "$YOUR_PRIVATE_KEY" ]; then
-            echo "Private Key cannot be empty. Skipping node $i."
+            echo "Private Key for node $i is empty. Skipping node."
             continue
         fi
 
@@ -104,7 +130,26 @@ function run_wibucrypto_validator() {
     done
 }
 
+# Main menu
+function main_menu() {
+    while true; do
+        echo
+        echo "1. Setup environment"
+        echo "2. Run WibuCrypto Validator"
+        echo "3. Delete all nodes"
+        echo "4. Exit"
+        echo
+        read -p "Choose an option: " CHOICE
+
+        case $CHOICE in
+            1) setup_environment ;;
+            2) read_private_keys; read_proxy; run_wibucrypto_validator ;;
+            3) delete_all_nodes ;;
+            4) exit 0 ;;
+            *) echo "Invalid option, please try again." ;;
+        esac
+    done
+}
+
 # Execute script
-setup_environment
-read_proxy
-run_wibucrypto_validator
+main_menu
