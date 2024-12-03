@@ -93,10 +93,11 @@ function run_wibucrypto_validator() {
         exit 1
     fi
 
-    if [ "$NODE_COUNT" -gt "${#PRIVATE_KEYS[@]}" ]; then
-        echo "Not enough private keys in privatekeys.txt for $NODE_COUNT nodes."
-        exit 1
-    fi
+if [ "$NODE_COUNT" -gt "${#PRIVATE_KEYS[@]}" ]; then
+    echo "Requested $NODE_COUNT nodes, but only ${#PRIVATE_KEYS[@]} private keys are available in privatekeys.txt."
+    exit 1
+fi
+
 
     # Loop through each node creation
     for (( i=1; i<=NODE_COUNT; i++ )); do
