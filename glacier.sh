@@ -54,12 +54,21 @@ function read_private_keys() {
         echo "privatekeys.txt file not found! Please make sure the privatekeys.txt file exists."
         exit 1
     fi
-    
-    # Read private keys from file
+
+    # Read private keys from file, ignoring empty lines
     PRIVATE_KEYS=()
-    while IFS= read -r line; do
-        PRIVATE_KEYS+=("$line")
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Trim leading/trailing whitespace and skip empty lines
+        key=$(echo "$line" | xargs)
+        if [ -n "$key" ]; then
+            PRIVATE_KEYS+=("$key")
+        fi
     done < "privatekeys.txt"
+
+    if [ "${#PRIVATE_KEYS[@]}" -eq 0 ]; then
+        echo "No valid private keys found in privatekeys.txt."
+        exit 1
+    fi
 }
 
 # Delete all nodes
